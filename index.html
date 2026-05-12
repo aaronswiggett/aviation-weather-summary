@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aviation Flight Category Summary | GitHub Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .loader { border-top-color: #3498db; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .table-container { max-height: 60vh; overflow: auto; }
+        table thead th { position: sticky; top: 0; background-color: #f9fafb; z-index: 10; }
+        .sortable-header { cursor: pointer; transition: background-color 0.2s; }
+        .sortable-header:hover { background-color: #f3f4f6; }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-7xl bg-white rounded-xl shadow-lg p-6 md:p-8">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Aviation Flight Category Summary</h1>
+             <p class="text-gray-600 mt-2">Professional METAR Analysis & TAF Overlay System</p>
+        </div>
+
+        <form id="dataForm" class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 items-end">
+            <div>
+                <label for="state" class="block text-sm font-medium text-gray-700 mb-1">State Abbreviation</label>
+                <input type="text" id="state" class="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md" placeholder="NC" value="NC" maxlength="2" required>
+            </div>
+            <div>
+                <label for="airport" class="block text-sm font-medium text-gray-700 mb-1">Airport ID (3 or 4 Letter)</label>
+                <input type="text" id="airport" class="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md" placeholder="RDU" value="RDU" pattern="[A-Za-z0-9]{3,4}" required>
+            </div>
+            <div>
+                <label for="date-picker" class="block text-sm font-medium text-gray-700 mb-1">Observation Date</label>
+                <input type="date" id="date-picker" class="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md" required>
+            </div>
+            <div class="sm:col-span-3">
+                <button type="submit" class="w-full bg-indigo-600 text-white font-semibold py-3 px-4 rounded-md hover:bg-indigo-700 transition duration-200">
+                    Fetch METAR Data
+                </button>
+            </div>
+        </form>
+
+        <div id="quick-select" class="mb-8 text-center">
+            <label class="text-sm font-medium text-gray-700 mr-2">Quick Select:</label>
+            <div class="inline-flex rounded-md shadow-sm" role="group">
+                <button type="button" class="px-4 py-2 text-sm font-medium bg-white border border-gray-200 rounded-l-lg hover:bg-gray-100" data-state="NC" data-airport="INT">INT</button>
+                <button type="button" class="px-4 py-2 text-sm font-medium bg-white border-t border-b border-gray-200 hover:bg-gray-100" data-state="NC" data-airport="GSO">GSO</button>
+                <button type="button" class="px-4 py-2 text-sm font-medium bg-white border-t border-b border-gray-200 hover:bg-gray-100" data-state="NC" data-airport="RDU">RDU</button>
+                <button type="button" class="px-4 py-2 text-sm font-medium bg-white border border-gray-200 rounded-r-md hover:bg-gray-100" data-state="NC" data-airport="FAY">FAY</button>
+            </div>
+        </div>
+
+        <div id="results" class="hidden">
+            <div id="loading" class="flex justify-center items-center my-8 hidden">
+                <div class="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-16 w-16"></div>
+                <p class="ml-4 text-gray-600 font-medium">Analyzing Weather Data...</p>
+            </div>
+            <div id="error" class="text-center my-8 p-4 bg-red-50 text-red-700 border border-red-200 rounded-md font-semibold hidden"></div>
+            
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Hourly Flight Category Distribution</h2>
+            <div class="w-full border border-gray-200 rounded-lg table-container mb-8 shadow-sm">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead id="summary-head" class="bg-gray-50"></thead>
+                    <tbody id="summary-body" class="bg-white divide-y divide-gray-200"></tbody>
+                </table>
+            </div>
+            
+            <section class="mb-8 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                <button id="taf-toggle" class="w-full flex justify-between font-bold text-slate-800 transition hover:text-indigo-600">
+                    <span>Terminal Aerodrome Forecast (TAF) Overlay</span>
+                    <span id="taf-chevron">▼</span>
+                </button>
+                <div id="taf-content" class="hidden mt-4">
+                    <form id="tafForm" class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+                        <input type="date" id="taf-date" class="px-3 py-2 border rounded shadow-sm">
+                        <input type="text" id="taf-time" class="px-3 py-2 border rounded shadow-sm" placeholder="Issuance (HHMM UTC)">
+                        <button type="submit" class="bg-teal-600 text-white font-semibold py-2 rounded hover:bg-teal-700 transition">Fetch Forecast</button>
+                    </form>
+                    <pre id="raw-taf" class="mt-4 p-4 bg-white text-xs font-mono rounded border border-slate-200 hidden overflow-x-auto"></pre>
+                </div>
+            </section>
+
+            <section class="mb-8 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                <button id="crit-toggle" class="w-full flex justify-between font-bold text-slate-800 transition hover:text-indigo-600">
+                    <span>Customize Category Minimums</span>
+                    <span id="crit-chevron">▼</span>
+                </button>
+                <form id="criteriaForm" class="hidden mt-4 space-y-4">
+                    <div id="criteria-inputs" class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm"></div>
+                    <div class="flex gap-2">
+                        <button type="button" id="apply-crit" class="bg-indigo-600 text-white px-4 py-2 rounded font-semibold hover:bg-indigo-700 transition">Apply Changes</button>
+                        <button type="button" id="reset-crit" class="bg-gray-300 text-gray-700 px-4 py-2 rounded font-semibold hover:bg-gray-400 transition">Reset to FAA Defaults</button>
+                    </div>
+                </form>
+            </section>
+
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Detailed METAR Data Log</h2>
+            <div class="w-full border border-gray-200 rounded-lg table-container shadow-sm">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead id="raw-head" class="bg-gray-50"></thead>
+                    <tbody id="raw-body" class="bg-white divide-y divide-gray-200"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /** * 1. CONFIGURATION & PERMANENT STATE
+         */
+        const CATEGORY_MAP = {
+            'VFR':      { style: 'bg-blue-100 text-blue-800 border border-blue-200',   shade: 'bg-blue-50' },
+            'MVFR':     { style: 'bg-green-100 text-green-800 border border-green-200', shade: 'bg-green-50' },
+            'MVFR_ALT': { style: 'bg-green-700 text-white',     shade: 'bg-green-800 text-white' },
+            'IFR':      { style: 'bg-yellow-100 text-yellow-800 border border-yellow-200', shade: 'bg-yellow-50' },
+            'LIFR':     { style: 'bg-red-100 text-red-800 border border-red-200',      shade: 'bg-red-50' },
+            'VLIFR':    { style: 'bg-purple-100 text-purple-800 border border-purple-200', shade: 'bg-purple-50' }
+        };
+
+        const DEFAULT_CRITERIA = {
+            mvfr_vsby: 5, mvfr_cig: 3000, mvfr_alt_cig: 2000,
+            ifr_vsby: 3, ifr_cig: 1000, lifr_vsby: 2, lifr_cig: 600,
+            vlifr_vsby: 0.5, vlifr_cig: 200
+        };
+
+        let appState = {
+            reports: [],
+            criteria: JSON.parse(localStorage.getItem('wx_criteria')) || { ...DEFAULT_CRITERIA },
+            sortAsc: true,
+            tafForecast: Array(24).fill(null)
+        };
+
+        /** * 2. ANALYTICS & PARSING LOGIC
+         */
+        function parseVisibility(visStr) {
+            if (!visStr || visStr === 'N/A') return 99;
+            const clean = visStr.replace(/P|M|SM/g, '').trim();
+            if (clean.includes('/')) {
+                const parts = clean.split(' ');
+                let val = 0;
+                if (parts.length > 1) val += parseInt(parts[0]);
+                const frac = parts[parts.length - 1].split('/');
+                return val + (parseInt(frac[0]) / parseInt(frac[1]));
+            }
+            return parseFloat(clean);
+        }
+
+        function getCategory(vis, cig) {
+            const c = appState.criteria;
+            if (vis < c.vlifr_vsby || cig < c.vlifr_cig) return 'VLIFR';
+            if (vis < c.lifr_vsby || cig < c.lifr_cig) return 'LIFR';
+            if (vis < c.ifr_vsby || cig < c.ifr_cig) return 'IFR';
+            if (cig < c.mvfr_alt_cig) return 'MVFR_ALT';
+            if (vis <= c.mvfr_vsby || cig < c.mvfr_cig) return 'MVFR';
+            return 'VFR';
+        }
+
+        function parseMetarString(metar, isTaf = false) {
+            const main = metar.split(' RMK ')[0];
+            const visRegex = isTaf ? /(?:\s)(P?\d{1,2}\s?\d?\/?\d?SM)(?:\s)/ : /(?:\s)(M?(\d{1,2}\s)?\d{1,2}\/\d{1,2}SM|\d{1,2}SM)(?:\s)/;
+            const visMatch = main.match(visRegex);
+            const visibilityStr = visMatch ? visMatch[1] : '10SM';
+            
+            let ceiling = 99999;
+            const cloudMatch = main.match(/(SKC|CLR|FEW\d{3}|SCT\d{3}|BKN\d{3}|OVC\d{3}|VV\d{3})/g);
+            if (cloudMatch) {
+                cloudMatch.forEach(layer => {
+                    if (layer.match(/BKN|OVC|VV/)) {
+                        const alt = parseInt(layer.substring(3)) * 100;
+                        if (alt < ceiling) ceiling = alt;
+                    }
+                });
+            }
+            return {
+                visibility: visibilityStr,
+                clouds: cloudMatch ? cloudMatch.join(' ') : 'CLR',
+                category: getCategory(parseVisibility(visibilityStr), ceiling)
+            };
+        }
+
+        /** * 3. DOM RENDERING (Optimized with Fragments)
+         */
+        function renderSummary() {
+            const head = document.getElementById('summary-head');
+            const body = document.getElementById('summary-body');
+            
+            let hRow = '<tr><th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Flight Category</th>';
+            for(let i=0; i<24; i++) hRow += `<th class="px-2 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">${String(i).padStart(2, '0')}Z</th>`;
+            head.innerHTML = hRow + '</tr>';
+
+            const totals = {};
+            Object.keys(CATEGORY_MAP).forEach(k => totals[k] = Array(24).fill(0));
+            
+            for (let i = 0; i < appState.reports.length - 1; i++) {
+                const cur = appState.reports[i], next = appState.reports[i+1];
+                const diff = (next.date - cur.date) / 60000;
+                if (diff > 0 && diff <= 15) totals[cur.category][cur.date.getUTCHours()] += diff;
+            }
+
+            body.innerHTML = Object.keys(CATEGORY_MAP).map(cat => {
+                const config = CATEGORY_MAP[cat];
+                let row = `<tr><td class="px-4 py-3 text-sm font-bold"><span class="px-2 py-1 rounded shadow-sm ${config.style}">${cat}</span></td>`;
+                for(let h=0; h<24; h++) {
+                    const mins = Math.round(totals[cat][h]);
+                    const isDominant = mins > 0 && Object.keys(totals).every(k => totals[k][h] <= mins);
+                    row += `<td class="px-2 py-3 text-center text-xs font-mono transition-colors duration-200 ${isDominant ? config.shade : ''}">${mins || ''}</td>`;
+                }
+                return row + '</tr>';
+            }).join('');
+
+            if (appState.tafForecast.some(v => v !== null)) {
+                let tRow = `<tr class="bg-teal-50"><td class="px-4 py-3 text-sm font-bold border-t-2 border-teal-200">TAF Projection</td>`;
+                appState.tafForecast.forEach(cat => {
+                    tRow += `<td class="px-2 py-3 text-center text-xs border-t-2 border-teal-200">${cat ? `<span class="px-1.5 py-0.5 rounded-full text-[10px] shadow-sm ${CATEGORY_MAP[cat].style}">${cat}</span>` : ''}</td>`;
+                });
+                body.innerHTML += tRow + '</tr>';
+            }
+        }
+
+        function renderRawLog() {
+            const head = document.getElementById('raw-head');
+            const body = document.getElementById('raw-body');
+            
+            head.innerHTML = `<tr>
+                <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Station</th>
+                <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase sortable-header" id="sort-valid">Valid Time (UTC) ${appState.sortAsc ? '▼' : '▲'}</th>
+                <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Visibility</th>
+                <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Cloud Coverage</th>
+                <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Category</th>
+            </tr>`;
+
+            const fragment = document.createDocumentFragment();
+            appState.reports.forEach(r => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-50 transition-colors";
+                tr.innerHTML = `
+                    <td class="px-4 py-3 text-sm font-mono text-gray-600">${r.station}</td>
+                    <td class="px-4 py-3 text-sm font-mono text-gray-600">${r.valid}</td>
+                    <td class="px-4 py-3 text-sm text-gray-700">${r.visibility}</td>
+                    <td class="px-4 py-3 text-sm text-gray-700 truncate max-w-xs">${r.clouds}</td>
+                    <td class="px-4 py-3 text-sm font-bold"><span class="px-2 py-1 rounded shadow-sm ${CATEGORY_MAP[r.category].style}">${r.category}</span></td>
+                `;
+                fragment.appendChild(tr);
+            });
+            body.innerHTML = '';
+            body.appendChild(fragment);
+
+            document.getElementById('sort-valid').onclick = () => {
+                appState.sortAsc = !appState.sortAsc;
+                appState.reports.sort((a,b) => appState.sortAsc ? a.date - b.date : b.date - a.date);
+                renderRawLog();
+            };
+        }
+
+        /** * 4. API ENGINE (Bypass "Origin null" via GitHub Host)
+         */
+        async function fetchData() {
+            const st = document.getElementById('state').value.toUpperCase();
+            const ar = document.getElementById('airport').value.toUpperCase();
+            const d = new Date(document.getElementById('date-picker').value);
+            
+            const resultsDiv = document.getElementById('results');
+            const errorDiv = document.getElementById('error');
+            const loadingDiv = document.getElementById('loading');
+
+            resultsDiv.classList.remove('hidden');
+            loadingDiv.classList.remove('hidden');
+            errorDiv.classList.add('hidden');
+            
+            const nextD = new Date(d); 
+            nextD.setDate(d.getDate() + 1);
+
+            const iemUrl = `https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py?network=${st}_ASOS&station=${ar}&data=all&year1=${d.getUTCFullYear()}&month1=${d.getUTCMonth()+1}&day1=${d.getUTCDate()}&year2=${nextD.getUTCFullYear()}&month2=${nextD.getUTCMonth()+1}&day2=${nextD.getUTCDate()}&tz=Etc/UTC&format=onlycomma&report_type=1&report_type=3`;
+
+            // GitHub-Specific HTTPS Proxy
+            const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(iemUrl)}`;
+
+            try {
+                const res = await fetch(proxy);
+                if (!res.ok) throw new Error(`Weather service unavailable (Status ${res.status})`);
+                
+                const text = await res.text();
+                const lines = text.trim().split('\n').filter(l => !l.startsWith('#'));
+                
+                if (lines.length < 2) throw new Error("No data returned for this station/date.");
+
+                const headers = lines[0].split(',');
+                const sIdx = headers.indexOf('station'), vIdx = headers.indexOf('valid'), mIdx = headers.indexOf('metar');
+
+                appState.reports = lines.slice(1).map(l => {
+                    const v = l.split(',');
+                    const parsed = parseMetarString(v[mIdx]);
+                    return { 
+                        station: v[sIdx], 
+                        valid: v[vIdx], 
+                        date: new Date(v[vIdx].replace(' ', 'T') + 'Z'), 
+                        metar: v[mIdx],
+                        ...parsed 
+                    };
+                }).sort((a,b) => a.date - b.date);
+
+                renderSummary();
+                renderRawLog();
+            } catch (e) {
+                errorDiv.textContent = `CRITICAL ERROR: ${e.message}. Ensure your Airport ID is correct.`;
+                errorDiv.classList.remove('hidden');
+            } finally {
+                loadingDiv.classList.add('hidden');
+            }
+        }
+
+        // Initialize Application
+        document.getElementById('dataForm').onsubmit = (e) => { e.preventDefault(); fetchData(); };
+        document.getElementById('date-picker').valueAsDate = new Date();
+        document.getElementById('taf-date').valueAsDate = new Date();
+
+        // Settings Logic
+        const critDiv = document.getElementById('criteria-inputs');
+        Object.keys(appState.criteria).forEach(k => {
+            critDiv.innerHTML += `<div><label class="block text-[10px] font-bold text-gray-500 uppercase tracking-tighter">${k.replace('_',' ')}</label>
+                <input type="number" step="0.1" id="input-${k}" value="${appState.criteria[k]}" class="w-full p-1.5 border rounded bg-white shadow-sm focus:ring-2 focus:ring-indigo-500 outline-none"></div>`;
+        });
+
+        document.getElementById('apply-crit').onclick = () => {
+            Object.keys(appState.criteria).forEach(k => appState.criteria[k] = parseFloat(document.getElementById(`input-${k}`).value));
+            localStorage.setItem('wx_criteria', JSON.stringify(appState.criteria));
+            if (appState.reports.length) {
+                appState.reports.forEach(r => Object.assign(r, parseMetarString(r.metar)));
+                renderSummary(); renderRawLog();
+            }
+            alert("Criteria updated successfully.");
+        };
+
+        document.getElementById('reset-crit').onclick = () => {
+            appState.criteria = { ...DEFAULT_CRITERIA };
+            localStorage.removeItem('wx_criteria');
+            location.reload();
+        };
+
+        const setupToggle = (btnId, contentId, chevronId) => {
+            document.getElementById(btnId).onclick = () => {
+                const el = document.getElementById(contentId);
+                el.classList.toggle('hidden');
+                document.getElementById(chevronId).textContent = el.classList.contains('hidden') ? '▼' : '▲';
+            };
+        };
+        setupToggle('taf-toggle', 'taf-content', 'taf-chevron');
+        setupToggle('crit-toggle', 'criteriaForm', 'crit-chevron');
+
+        document.getElementById('quick-select').onclick = (e) => {
+            if (e.target.dataset.state) {
+                document.getElementById('state').value = e.target.dataset.state;
+                document.getElementById('airport').value = e.target.dataset.airport;
+            }
+        };
+
+        // Forecast Logic
+        document.getElementById('tafForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const ar = document.getElementById('airport').value;
+            const dt = document.getElementById('taf-date').value.replace(/-/g, '');
+            const tm = document.getElementById('taf-time').value;
+            
+            const tafUrl = `https://mesonet.agron.iastate.edu/wx/afos/p.php?pil=TAF${ar}&e=${dt}${tm}`;
+            
+            try {
+                const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(tafUrl)}`);
+                const html = await res.text();
+                const match = html.match(/<pre class="afos-pre">(.*?)<\/pre>/s);
+                if (!match) throw new Error("No TAF found for this timestamp.");
+                
+                const raw = match[1].trim();
+                document.getElementById('raw-taf').textContent = raw;
+                document.getElementById('raw-taf').classList.remove('hidden');
+
+                const baseCat = parseMetarString(raw, true).category;
+                appState.tafForecast = Array(24).fill(baseCat);
+                renderSummary();
+            } catch (err) { alert(`TAF Error: ${err.message}`); }
+        };
+    </script>
+</body>
+</html>
