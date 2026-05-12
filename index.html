@@ -109,8 +109,7 @@
     </div>
 
     <script>
-        /** * 1. CONFIGURATION & PERMANENT STATE
-         */
+        /** * 1. CONFIGURATION & PERMANENT STATE */
         const CATEGORY_MAP = {
             'VFR':      { style: 'bg-blue-100 text-blue-800 border border-blue-200',   shade: 'bg-blue-50' },
             'MVFR':     { style: 'bg-green-100 text-green-800 border border-green-200', shade: 'bg-green-50' },
@@ -133,8 +132,7 @@
             tafForecast: Array(24).fill(null)
         };
 
-        /** * 2. ANALYTICS & PARSING LOGIC
-         */
+        /** * 2. ANALYTICS & PARSING LOGIC */
         function parseVisibility(visStr) {
             if (!visStr || visStr === 'N/A') return 99;
             const clean = visStr.replace(/P|M|SM/g, '').trim();
@@ -181,8 +179,7 @@
             };
         }
 
-        /** * 3. DOM RENDERING (Optimized with Fragments)
-         */
+        /** * 3. DOM RENDERING */
         function renderSummary() {
             const head = document.getElementById('summary-head');
             const body = document.getElementById('summary-body');
@@ -223,31 +220,16 @@
         function renderRawLog() {
             const head = document.getElementById('raw-head');
             const body = document.getElementById('raw-body');
-            
-            head.innerHTML = `<tr>
-                <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Station</th>
-                <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase sortable-header" id="sort-valid">Valid Time (UTC) ${appState.sortAsc ? '▼' : '▲'}</th>
-                <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Visibility</th>
-                <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Cloud Coverage</th>
-                <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Category</th>
-            </tr>`;
-
+            head.innerHTML = `<tr><th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Station</th><th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase sortable-header" id="sort-valid">Valid Time (UTC) ${appState.sortAsc ? '▼' : '▲'}</th><th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Visibility</th><th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Cloud Coverage</th><th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Category</th></tr>`;
             const fragment = document.createDocumentFragment();
             appState.reports.forEach(r => {
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-gray-50 transition-colors";
-                tr.innerHTML = `
-                    <td class="px-4 py-3 text-sm font-mono text-gray-600">${r.station}</td>
-                    <td class="px-4 py-3 text-sm font-mono text-gray-600">${r.valid}</td>
-                    <td class="px-4 py-3 text-sm text-gray-700">${r.visibility}</td>
-                    <td class="px-4 py-3 text-sm text-gray-700 truncate max-w-xs">${r.clouds}</td>
-                    <td class="px-4 py-3 text-sm font-bold"><span class="px-2 py-1 rounded shadow-sm ${CATEGORY_MAP[r.category].style}">${r.category}</span></td>
-                `;
+                tr.innerHTML = `<td class="px-4 py-3 text-sm font-mono text-gray-600">${r.station}</td><td class="px-4 py-3 text-sm font-mono text-gray-600">${r.valid}</td><td class="px-4 py-3 text-sm text-gray-700">${r.visibility}</td><td class="px-4 py-3 text-sm text-gray-700 truncate max-w-xs">${r.clouds}</td><td class="px-4 py-3 text-sm font-bold"><span class="px-2 py-1 rounded shadow-sm ${CATEGORY_MAP[r.category].style}">${r.category}</span></td>`;
                 fragment.appendChild(tr);
             });
             body.innerHTML = '';
             body.appendChild(fragment);
-
             document.getElementById('sort-valid').onclick = () => {
                 appState.sortAsc = !appState.sortAsc;
                 appState.reports.sort((a,b) => appState.sortAsc ? a.date - b.date : b.date - a.date);
@@ -255,12 +237,12 @@
             };
         }
 
-        /** * 4. API ENGINE (Bypass "Origin null" via GitHub Host)
-         */
+        /** * 4. API ENGINE (Fixed Network Blocking Issue) */
         async function fetchData() {
             const st = document.getElementById('state').value.toUpperCase();
             const ar = document.getElementById('airport').value.toUpperCase();
-            const d = new Date(document.getElementById('date-picker').value);
+            const dInput = document.getElementById('date-picker').value;
+            const d = new Date(dInput);
             
             const resultsDiv = document.getElementById('results');
             const errorDiv = document.getElementById('error');
@@ -275,29 +257,21 @@
 
             const iemUrl = `https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py?network=${st}_ASOS&station=${ar}&data=all&year1=${d.getUTCFullYear()}&month1=${d.getUTCMonth()+1}&day1=${d.getUTCDate()}&year2=${nextD.getUTCFullYear()}&month2=${nextD.getUTCMonth()+1}&day2=${nextD.getUTCDate()}&tz=Etc/UTC&format=onlycomma&report_type=1&report_type=3`;
 
-            // FASTER PROXY: Optimized for hosted HTTPS sites like GitHub Pages
-            const proxy = `https://corsproxy.io/?${encodeURIComponent(iemUrl)}`;
-
-            // Timeout Logic: Prevent 20-second hangs
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second limit
+            // STEALTH PROXY: Bypassing ERR_CONNECTION_REFUSED by using CodeTabs
+            const proxy = `https://api.codetabs.com/v1/proxy?url=${encodeURIComponent(iemUrl)}`;
 
             try {
-                const res = await fetch(proxy, { signal: controller.signal });
-                clearTimeout(timeoutId);
-
-                if (!res.ok) throw new Error(`Weather service returned status ${res.status}`);
+                const res = await fetch(proxy);
+                if (!res.ok) throw new Error(`Proxy refused connection (Status ${res.status}). Your network may be blocking this service.`);
                 
                 const text = await res.text();
                 
-                // Safety Check: Ensure the proxy didn't return an error page instead of CSV data
-                if (text.includes("<!DOCTYPE html>") || text.includes("Error")) {
-                    throw new Error("The proxy returned an invalid response. Please try again in a moment.");
+                if (text.includes("<!DOCTYPE html>") || text.length < 50) {
+                    throw new Error("Invalid response received. Ensure the Airport ID is correct.");
                 }
 
                 const lines = text.trim().split('\n').filter(l => !l.startsWith('#'));
-                
-                if (lines.length < 2) throw new Error("No data found for this airport on the selected date.");
+                if (lines.length < 2) throw new Error("No observations found for this terminal on this date.");
 
                 const headers = lines[0].split(',');
                 const sIdx = headers.indexOf('station'), vIdx = headers.indexOf('valid'), mIdx = headers.indexOf('metar');
@@ -317,27 +291,22 @@
                 renderSummary();
                 renderRawLog();
             } catch (e) {
-                if (e.name === 'AbortError') {
-                    errorDiv.textContent = "CRITICAL ERROR: Connection timed out. The weather proxy is busy, please try again.";
-                } else {
-                    errorDiv.textContent = `CRITICAL ERROR: ${e.message}`;
-                }
+                errorDiv.textContent = `NETWORK ERROR: ${e.message}`;
                 errorDiv.classList.remove('hidden');
+                console.error("Fetch Error:", e);
             } finally {
                 loadingDiv.classList.add('hidden');
             }
         }
 
-        // Initialize Application
+        // Initialize
         document.getElementById('dataForm').onsubmit = (e) => { e.preventDefault(); fetchData(); };
         document.getElementById('date-picker').valueAsDate = new Date();
         document.getElementById('taf-date').valueAsDate = new Date();
 
-        // Settings Logic
         const critDiv = document.getElementById('criteria-inputs');
         Object.keys(appState.criteria).forEach(k => {
-            critDiv.innerHTML += `<div><label class="block text-[10px] font-bold text-gray-500 uppercase tracking-tighter">${k.replace('_',' ')}</label>
-                <input type="number" step="0.1" id="input-${k}" value="${appState.criteria[k]}" class="w-full p-1.5 border rounded bg-white shadow-sm focus:ring-2 focus:ring-indigo-500 outline-none"></div>`;
+            critDiv.innerHTML += `<div><label class="block text-[10px] font-bold text-gray-500 uppercase">${k.replace('_',' ')}</label><input type="number" step="0.1" id="input-${k}" value="${appState.criteria[k]}" class="w-full p-1.5 border rounded bg-white shadow-sm outline-none"></div>`;
         });
 
         document.getElementById('apply-crit').onclick = () => {
@@ -347,7 +316,7 @@
                 appState.reports.forEach(r => Object.assign(r, parseMetarString(r.metar)));
                 renderSummary(); renderRawLog();
             }
-            alert("Criteria updated successfully.");
+            alert("Criteria updated.");
         };
 
         document.getElementById('reset-crit').onclick = () => {
@@ -373,29 +342,24 @@
             }
         };
 
-        // Forecast Logic
         document.getElementById('tafForm').onsubmit = async (e) => {
             e.preventDefault();
             const ar = document.getElementById('airport').value;
             const dt = document.getElementById('taf-date').value.replace(/-/g, '');
             const tm = document.getElementById('taf-time').value;
-            
             const tafUrl = `https://mesonet.agron.iastate.edu/wx/afos/p.php?pil=TAF${ar}&e=${dt}${tm}`;
-            
             try {
-                const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(tafUrl)}`);
+                const res = await fetch(`https://api.codetabs.com/v1/proxy?url=${encodeURIComponent(tafUrl)}`);
                 const html = await res.text();
                 const match = html.match(/<pre class="afos-pre">(.*?)<\/pre>/s);
-                if (!match) throw new Error("No TAF found for this timestamp.");
-                
+                if (!match) throw new Error("TAF not found.");
                 const raw = match[1].trim();
                 document.getElementById('raw-taf').textContent = raw;
                 document.getElementById('raw-taf').classList.remove('hidden');
-
                 const baseCat = parseMetarString(raw, true).category;
                 appState.tafForecast = Array(24).fill(baseCat);
                 renderSummary();
-            } catch (err) { alert(`TAF Error: ${err.message}`); }
+            } catch (err) { alert(`TAF Fetch Error: ${err.message}`); }
         };
     </script>
 </body>
