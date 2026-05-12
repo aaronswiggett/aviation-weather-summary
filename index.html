@@ -275,17 +275,29 @@
 
             const iemUrl = `https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py?network=${st}_ASOS&station=${ar}&data=all&year1=${d.getUTCFullYear()}&month1=${d.getUTCMonth()+1}&day1=${d.getUTCDate()}&year2=${nextD.getUTCFullYear()}&month2=${nextD.getUTCMonth()+1}&day2=${nextD.getUTCDate()}&tz=Etc/UTC&format=onlycomma&report_type=1&report_type=3`;
 
-            // GitHub-Specific HTTPS Proxy
-            const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(iemUrl)}`;
+            // FASTER PROXY: Optimized for hosted HTTPS sites like GitHub Pages
+            const proxy = `https://corsproxy.io/?${encodeURIComponent(iemUrl)}`;
+
+            // Timeout Logic: Prevent 20-second hangs
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second limit
 
             try {
-                const res = await fetch(proxy);
-                if (!res.ok) throw new Error(`Weather service unavailable (Status ${res.status})`);
+                const res = await fetch(proxy, { signal: controller.signal });
+                clearTimeout(timeoutId);
+
+                if (!res.ok) throw new Error(`Weather service returned status ${res.status}`);
                 
                 const text = await res.text();
+                
+                // Safety Check: Ensure the proxy didn't return an error page instead of CSV data
+                if (text.includes("<!DOCTYPE html>") || text.includes("Error")) {
+                    throw new Error("The proxy returned an invalid response. Please try again in a moment.");
+                }
+
                 const lines = text.trim().split('\n').filter(l => !l.startsWith('#'));
                 
-                if (lines.length < 2) throw new Error("No data returned for this station/date.");
+                if (lines.length < 2) throw new Error("No data found for this airport on the selected date.");
 
                 const headers = lines[0].split(',');
                 const sIdx = headers.indexOf('station'), vIdx = headers.indexOf('valid'), mIdx = headers.indexOf('metar');
@@ -305,7 +317,11 @@
                 renderSummary();
                 renderRawLog();
             } catch (e) {
-                errorDiv.textContent = `CRITICAL ERROR: ${e.message}. Ensure your Airport ID is correct.`;
+                if (e.name === 'AbortError') {
+                    errorDiv.textContent = "CRITICAL ERROR: Connection timed out. The weather proxy is busy, please try again.";
+                } else {
+                    errorDiv.textContent = `CRITICAL ERROR: ${e.message}`;
+                }
                 errorDiv.classList.remove('hidden');
             } finally {
                 loadingDiv.classList.add('hidden');
