@@ -3,15 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aviation Flight Category Summary | GitHub Edition</title>
+    <title>Aviation Flight Category Summary</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; }
-        .loader { border-top-color: #3498db; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .table-container { max-height: 60vh; overflow: auto; }
-        table thead th { position: sticky; top: 0; background-color: #f9fafb; z-index: 10; }
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .loader {
+            border-top-color: #3498db;
+            -webkit-animation: spin 1s linear infinite;
+            animation: spin 1s linear infinite;
+        }
+        @-webkit-keyframes spin {
+            0% { -webkit-transform: rotate(0deg); }
+            100% { -webkit-transform: rotate(360deg); }
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .table-container {
+            max-height: 60vh;
+            overflow: auto;
+        }
+        table thead th {
+            position: sticky;
+            top: 0;
+            background-color: #f9fafb;
+            z-index: 10;
+        }
+        .sortable-header {
+            cursor: pointer;
+        }
+        .sortable-header:hover {
+            background-color: #f0f0f0;
+        }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800 flex items-center justify-center min-h-screen p-4">
@@ -19,184 +46,566 @@
     <div class="w-full max-w-7xl bg-white rounded-xl shadow-lg p-6 md:p-8">
         <div class="text-center mb-8">
             <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Aviation Flight Category Summary</h1>
-             <p class="text-gray-600 mt-2">Professional METAR Analysis & TAF Overlay System</p>
+             <p class="text-gray-600 mt-2">Enter a state, airport, and date to generate a summary of 5-minute METAR data.</p>
         </div>
 
         <form id="dataForm" class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 items-end">
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">State (e.g., NC)</label>
-                <input type="text" id="state" class="w-full px-3 py-2 border rounded-md" value="NC" maxlength="2" required>
+                <label for="state" class="block text-sm font-medium text-gray-700 mb-1">State Abbreviation</label>
+                <input type="text" id="state" class="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="e.g., NC" value="NC" maxlength="2">
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Airport (e.g., RDU)</label>
-                <input type="text" id="airport" class="w-full px-3 py-2 border rounded-md" value="RDU" maxlength="4" required>
+                <label for="airport" class="block text-sm font-medium text-gray-700 mb-1">Airport ID (3-Letter)</label>
+                <input type="text" id="airport" class="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="e.g., RDU" value="RDU" maxlength="3">
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                <input type="date" id="date-picker" class="w-full px-3 py-2 border rounded-md" required>
+                <label for="date-picker" class="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                <input type="date" id="date-picker" class="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
             </div>
             <div class="sm:col-span-3">
-                <button type="submit" class="w-full bg-indigo-600 text-white font-semibold py-3 rounded-md hover:bg-indigo-700 transition">Fetch METAR Data</button>
+                <button type="submit" class="w-full bg-indigo-600 text-white font-semibold py-3 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out">
+                    Fetch METAR Data
+                </button>
             </div>
         </form>
 
-        <div id="results" class="hidden">
-            <div id="loading" class="flex justify-center items-center my-8 hidden">
-                <div class="loader rounded-full border-8 border-t-8 border-gray-200 h-16 w-16"></div>
-                <p class="ml-4 text-gray-600">Attempting connection...</p>
+        <div id="quick-select-container" class="mb-8 text-center">
+            <label class="text-sm font-medium text-gray-700 mr-2">Quick Select:</label>
+            <div class="inline-flex rounded-md shadow-sm" role="group">
+                <button type="button" class="quick-select-btn px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-200 rounded-l-lg hover:bg-gray-100" data-state="NC" data-airport="INT">INT</button>
+                <button type="button" class="quick-select-btn px-4 py-2 text-sm font-medium text-gray-900 bg-white border-t border-b border-gray-200 hover:bg-gray-100" data-state="NC" data-airport="GSO">GSO</button>
+                <button type="button" class="quick-select-btn px-4 py-2 text-sm font-medium text-gray-900 bg-white border-t border-b border-gray-200 hover:bg-gray-100" data-state="NC" data-airport="RDU">RDU</button>
+                <button type="button" class="quick-select-btn px-4 py-2 text-sm font-medium text-gray-900 bg-white border-t border-b border-gray-200 hover:bg-gray-100" data-state="NC" data-airport="FAY">FAY</button>
+                <button type="button" class="quick-select-btn px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-200 rounded-r-md hover:bg-gray-100" data-state="NC" data-airport="RWI">RWI</button>
             </div>
-            <div id="error" class="text-center my-8 p-4 bg-red-50 text-red-700 border border-red-200 rounded-md hidden"></div>
+        </div>
+
+        <div id="results" class="hidden">
+            <div id="loading" class="flex justify-center items-center my-8">
+                <div class="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-24 w-24"></div>
+                <p class="ml-4 text-gray-600">Fetching data...</p>
+            </div>
+            <div id="error" class="text-center my-8 text-red-600 font-semibold hidden"></div>
             
-            <div class="w-full border rounded-lg table-container mb-8">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Hourly Summary</h2>
+            <div id="summary-table-container" class="w-full border border-gray-200 rounded-lg hidden table-container">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead id="summary-head" class="bg-gray-50"></thead>
-                    <tbody id="summary-body" class="bg-white"></tbody>
+                    <tbody id="summary-body" class="bg-white divide-y divide-gray-200"></tbody>
                 </table>
             </div>
+            
+            <div id="taf-container" class="hidden">
+                 <button id="taf-toggle" class="w-full flex justify-between items-center text-left text-xl font-bold text-gray-800 mt-8 mb-4 py-2">
+                    <span>Add/View TAF Forecast</span>
+                    <svg id="taf-chevron" class="w-5 h-5 transform transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+                <div id="taf-content" class="hidden mb-4 p-4 bg-gray-50 rounded-lg border">
+                    <form id="tafForm" class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+                        <div>
+                            <label for="taf-date-picker" class="block text-sm font-medium text-gray-700 mb-1">TAF Issuance Date (UTC)</label>
+                            <input type="date" id="taf-date-picker" class="w-full px-3 py-2 bg-white border-gray-300 rounded-md shadow-sm">
+                        </div>
+                        <div>
+                            <label for="taf-time" class="block text-sm font-medium text-gray-700 mb-1">TAF Issuance Time (HHMM UTC)</label>
+                            <input type="text" id="taf-time" class="w-full px-3 py-2 bg-white border-gray-300 rounded-md shadow-sm" placeholder="e.g., 1200" maxlength="4">
+                        </div>
+                        <div class="sm:col-span-1">
+                            <button type="submit" class="w-full bg-teal-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-teal-700">Fetch TAF</button>
+                        </div>
+                    </form>
+                    <div id="taf-display-container" class="hidden mt-4">
+                         <h3 class="text-lg font-semibold text-gray-800 mb-2">Raw TAF</h3>
+                         <pre id="raw-taf-text" class="bg-white p-4 rounded-md text-sm font-mono whitespace-pre-wrap"></pre>
+                    </div>
+                </div>
+            </div>
 
-            <h2 class="text-xl font-bold text-gray-800 mb-4">Raw Data Log</h2>
-            <div class="w-full border rounded-lg table-container">
+            <div id="criteria-container" class="hidden">
+                 <button id="criteria-toggle" class="w-full flex justify-between items-center text-left text-xl font-bold text-gray-800 mt-8 mb-4 py-2">
+                    <span>Customize Flight Category Criteria</span>
+                    <svg id="criteria-chevron" class="w-5 h-5 transform transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+                <form id="criteriaForm" class="hidden mb-4 p-4 bg-gray-50 rounded-lg border">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                        <div>
+                            <label class="font-bold text-green-800">MVFR (Vsby ≤ / Cig <)</label>
+                            <div class="flex gap-2 mt-1">
+                                <input type="number" step="0.1" id="mvfr_vsby" class="w-full p-1 border rounded" placeholder="Vsby">
+                                <input type="number" step="100" id="mvfr_cig" class="w-full p-1 border rounded" placeholder="Cig">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="font-bold text-green-900">MVFR_ALT (Cig <)</label>
+                            <div class="flex gap-2 mt-1">
+                                <input type="number" step="100" id="mvfr_alt_cig" class="w-full p-1 border rounded" placeholder="Cig">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="font-bold text-yellow-800">IFR (Vsby < / Cig <)</label>
+                            <div class="flex gap-2 mt-1">
+                                <input type="number" step="0.1" id="ifr_vsby" class="w-full p-1 border rounded" placeholder="Vsby">
+                                <input type="number" step="100" id="ifr_cig" class="w-full p-1 border rounded" placeholder="Cig">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="font-bold text-red-800">LIFR (Vsby < / Cig <)</label>
+                            <div class="flex gap-2 mt-1">
+                                <input type="number" step="0.1" id="lifr_vsby" class="w-full p-1 border rounded" placeholder="Vsby">
+                                <input type="number" step="100" id="lifr_cig" class="w-full p-1 border rounded" placeholder="Cig">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="font-bold text-purple-800">VLIFR (Vsby < / Cig <)</label>
+                            <div class="flex gap-2 mt-1">
+                                <input type="number" step="0.1" id="vlifr_vsby" class="w-full p-1 border rounded" placeholder="Vsby">
+                                <input type="number" step="100" id="vlifr_cig" class="w-full p-1 border rounded" placeholder="Cig">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex gap-4">
+                        <button type="button" id="applyCriteria" class="w-full bg-indigo-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-indigo-700">Apply Changes</button>
+                        <button type="button" id="resetCriteria" class="w-full bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-md hover:bg-gray-400">Reset to Defaults</button>
+                    </div>
+                </form>
+            </div>
+
+            <h2 class="text-xl font-bold text-gray-800 mt-8 mb-4">Raw Data Log</h2>
+            <div id="table-container" class="w-full border border-gray-200 rounded-lg hidden table-container">
                 <table class="min-w-full divide-y divide-gray-200">
-                    <thead id="raw-head" class="bg-gray-50"></thead>
-                    <tbody id="raw-body" class="bg-white"></tbody>
+                    <thead id="table-head" class="bg-gray-50"></thead>
+                    <tbody id="table-body" class="bg-white divide-y divide-gray-200"></tbody>
                 </table>
             </div>
         </div>
     </div>
 
     <script>
-        const CATEGORY_MAP = {
-            'VFR':      { style: 'bg-blue-100 text-blue-800 border', shade: 'bg-blue-50' },
-            'MVFR':     { style: 'bg-green-100 text-green-800 border', shade: 'bg-green-50' },
-            'MVFR_ALT': { style: 'bg-green-700 text-white', shade: 'bg-green-800' },
-            'IFR':      { style: 'bg-yellow-100 text-yellow-800 border', shade: 'bg-yellow-50' },
-            'LIFR':     { style: 'bg-red-100 text-red-800 border', shade: 'bg-red-50' },
-            'VLIFR':    { style: 'bg-purple-100 text-purple-800 border', shade: 'bg-purple-50' }
-        };
+        // DOM Elements
+        const getEl = id => document.getElementById(id);
+        const stateInput = getEl('state');
+        const airportInput = getEl('airport');
+        const dataForm = getEl('dataForm');
+        const tafForm = getEl('tafForm');
+        const resultsDiv = getEl('results');
+        const loadingDiv = getEl('loading');
+        const errorDiv = getEl('error');
+        const tableContainer = getEl('table-container');
+        const tableHead = getEl('table-head');
+        const tableBody = getEl('table-body');
+        const summaryTableContainer = getEl('summary-table-container');
+        const summaryHead = getEl('summary-head');
+        const summaryBody = getEl('summary-body');
+        const criteriaContainer = getEl('criteria-container');
+        const criteriaToggle = getEl('criteria-toggle');
+        const criteriaChevron = getEl('criteria-chevron');
+        const criteriaForm = getEl('criteriaForm');
+        const applyCriteriaBtn = getEl('applyCriteria');
+        const resetCriteriaBtn = getEl('resetCriteria');
+        const tafContainer = getEl('taf-container');
+        const tafToggle = getEl('taf-toggle');
+        const tafChevron = getEl('taf-chevron');
+        const tafContent = getEl('taf-content');
+        const tafDisplayContainer = getEl('taf-display-container');
+        const rawTafText = getEl('raw-taf-text');
+        const quickSelectContainer = getEl('quick-select-container');
+        const datePicker = getEl('date-picker');
+        const tafDatePicker = getEl('taf-date-picker');
 
-        const DEFAULT_CRITERIA = {
-            mvfr_vsby: 5, mvfr_cig: 3000, mvfr_alt_cig: 2000,
-            ifr_vsby: 3, ifr_cig: 1000, lifr_vsby: 2, lifr_cig: 600,
+        // State Variables
+        let lastFetchedCsvText = '';
+        let allParsedReports = [];
+        let isSortAscending = true;
+        let hourlyTotals = {};
+
+        const defaultCriteria = {
+            mvfr_vsby: 5, mvfr_cig: 3000,
+            mvfr_alt_cig: 2000,
+            ifr_vsby: 3, ifr_cig: 1000,
+            lifr_vsby: 2, lifr_cig: 600,
             vlifr_vsby: 0.5, vlifr_cig: 200
         };
 
-        let appState = { reports: [], criteria: { ...DEFAULT_CRITERIA }, sortAsc: true };
+        const categories = ['VFR', 'MVFR', 'MVFR_ALT', 'IFR', 'LIFR', 'VLIFR'];
+        const categoryStyles = {
+            VLIFR: { badge: 'bg-purple-200 text-purple-800', shade: 'bg-purple-300' },
+            LIFR: { badge: 'bg-red-200 text-red-800', shade: 'bg-red-300' },
+            IFR: { badge: 'bg-yellow-200 text-yellow-800', shade: 'bg-yellow-300' },
+            MVFR_ALT: { badge: 'bg-green-600 text-white', shade: 'bg-green-700 text-white' },
+            MVFR: { badge: 'bg-green-200 text-green-800', shade: 'bg-green-300' },
+            VFR: { badge: 'bg-blue-200 text-blue-800', shade: 'bg-blue-300' }
+        };
 
-        function getCategory(vis, cig) {
-            const c = appState.criteria;
-            if (vis < c.vlifr_vsby || cig < c.vlifr_cig) return 'VLIFR';
-            if (vis < c.lifr_vsby || cig < c.lifr_cig) return 'LIFR';
-            if (vis < c.ifr_vsby || cig < c.ifr_cig) return 'IFR';
-            if (cig < c.mvfr_alt_cig) return 'MVFR_ALT';
-            if (vis <= c.mvfr_vsby || cig < c.mvfr_cig) return 'MVFR';
-            return 'VFR';
+        let currentCriteria = { ...defaultCriteria };
+
+        // Criteria Functions
+        function populateCriteriaForm() {
+            Object.keys(currentCriteria).forEach(key => getEl(key).value = currentCriteria[key]);
         }
 
-        function parseMetar(metar) {
-            const main = metar.split(' RMK ')[0];
-            const visMatch = main.match(/(?:\s)(M?(\d{1,2}\s)?\d{1,2}\/\d{1,2}SM|\d{1,2}SM)(?:\s)/);
-            const visStr = visMatch ? visMatch[1] : '10SM';
+        function updateCriteriaFromForm() {
+            Object.keys(currentCriteria).forEach(key => currentCriteria[key] = parseFloat(getEl(key).value));
+        }
+
+        applyCriteriaBtn.addEventListener('click', () => {
+            updateCriteriaFromForm();
+            if (lastFetchedCsvText) displayData(lastFetchedCsvText);
+        });
+
+        resetCriteriaBtn.addEventListener('click', () => {
+            currentCriteria = { ...defaultCriteria };
+            populateCriteriaForm();
+            if (lastFetchedCsvText) displayData(lastFetchedCsvText);
+        });
+        
+        // Date Defaults
+        const today = new Date();
+        datePicker.valueAsDate = today;
+        tafDatePicker.valueAsDate = today;
+
+        datePicker.addEventListener('change', () => tafDatePicker.value = datePicker.value);
+
+        // Utility: Fetch UI Handling
+        async function fetchAndDisplay(targetUrl) {
+            resultsDiv.classList.remove('hidden');
+            loadingDiv.classList.remove('hidden');
+            errorDiv.classList.add('hidden');
+            [tableContainer, summaryTableContainer, criteriaContainer, tafContainer, tafContent, tafDisplayContainer, criteriaForm].forEach(el => el.classList.add('hidden'));
+            criteriaChevron.classList.remove('rotate-180');
+            tafChevron.classList.remove('rotate-180');
+
+            try {
+                const response = await fetch(targetUrl); // Fetching directly from IEM
+                if (!response.ok) throw new Error(`The weather service returned an error: ${response.status}`);
+                
+                lastFetchedCsvText = await response.text();
+                if (!lastFetchedCsvText || lastFetchedCsvText.includes("No data found for this station")) {
+                     throw new Error(`No data found for the station in the provided URL.`);
+                }
+                
+                displayData(lastFetchedCsvText);
+                [tableContainer, summaryTableContainer, criteriaContainer, tafContainer].forEach(el => el.classList.remove('hidden'));
+                populateCriteriaForm();
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                loadingDiv.classList.add('hidden');
+            }
+        }
+
+        // Event Listeners
+        dataForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const state = stateInput.value.toUpperCase();
+            const airport = airportInput.value.toUpperCase();
+            const selectedDate = new Date(datePicker.value);
+            const nextDate = new Date(selectedDate);
+            nextDate.setDate(nextDate.getDate() + 1);
+
+            const format = d => `year${d.num}=${d.date.getUTCFullYear()}&month${d.num}=${d.date.getUTCMonth() + 1}&day${d.num}=${d.date.getUTCDate()}`;
+            const dateParams = `${format({date: selectedDate, num: 1})}&${format({date: nextDate, num: 2})}`;
+
+            const network = `${state}_ASOS`;
+            const targetUrl = `https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py?network=${network}&station=${airport}&data=all&${dateParams}&tz=Etc/UTC&format=onlycomma&latlon=no&elev=no&missing=M&trace=T&direct=no&report_type=1&report_type=3&report_type=4`;
+            
+            fetchAndDisplay(targetUrl);
+        });
+
+        tafForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const airport = airportInput.value.toUpperCase();
+            const tafDate = new Date(tafDatePicker.value);
+            const tafTime = getEl('taf-time').value;
+
+            if (!tafTime || tafTime.length !== 4) return alert("Please enter a valid 4-digit TAF time (HHMM).");
+
+            const year = tafDate.getUTCFullYear();
+            const month = String(tafDate.getUTCMonth() + 1).padStart(2, '0');
+            const day = String(tafDate.getUTCDate()).padStart(2, '0');
+            
+            const targetUrl = `https://mesonet.agron.iastate.edu/wx/afos/p.php?pil=TAF${airport}&e=${year}${month}${day}${tafTime}`;
+
+            try {
+                const response = await fetch(targetUrl); // Fetching directly from IEM
+                if (!response.ok) throw new Error("Could not fetch TAF data.");
+                const text = await response.text();
+                
+                const match = text.match(/<pre class="afos-pre">(.*?)<\/pre>/s);
+                if (!match) throw new Error("Could not find TAF text on the page.");
+
+                const tafLines = match[1].trim().split('\n');
+                const tafText = tafLines.slice(tafLines.findIndex(l => l.trim().startsWith('TAF'))).join('\n').trim();
+
+                rawTafText.textContent = tafText;
+                tafDisplayContainer.classList.remove('hidden');
+
+                const metarDate = new Date(datePicker.value);
+                const { forecast, startHour } = parseTaf(tafText, metarDate);
+                updateSummaryWithTaf(forecast, startHour);
+            } catch (error) {
+                alert(`TAF Error: ${error.message}`);
+            }
+        });
+
+        criteriaToggle.addEventListener('click', () => {
+            criteriaForm.classList.toggle('hidden');
+            criteriaChevron.classList.toggle('rotate-180');
+        });
+
+        tafToggle.addEventListener('click', () => {
+            tafContent.classList.toggle('hidden');
+            tafChevron.classList.toggle('rotate-180');
+        });
+        
+        quickSelectContainer.addEventListener('click', (e) => {
+            if (e.target.classList.contains('quick-select-btn')) {
+                stateInput.value = e.target.dataset.state;
+                airportInput.value = e.target.dataset.airport;
+            }
+        });
+
+        // Parsers
+        function parseVisibilityToNumber(visStr) {
+            if (!visStr || visStr === 'N/A') return 99;
+            let cleanStr = visStr.replace(/^P|SM|M/g, '').trim();
+
+            if (cleanStr.includes('/')) {
+                const parts = cleanStr.split(' ');
+                let total = parts.length > 1 && !isNaN(parseInt(parts[0])) ? parseInt(parts[0]) : 0;
+                const fractionParts = (parts.length > 1 ? parts[1] : parts[0]).split('/');
+                if (fractionParts.length === 2) total += parseInt(fractionParts[0]) / parseInt(fractionParts[1]);
+                return total;
+            }
+            return parseFloat(cleanStr);
+        }
+
+        function parseMetar(metarString, isTaf = false) {
+            const mainMetar = metarString.split(' RMK ')[0];
+            const visRegex = isTaf ? /(?:\s)(P?\d{1,2}\s?\d?\/?\d?SM)(?:\s)/ : /(?:\s)(M?(\d{1,2}\s)?\d{1,2}\/\d{1,2}SM|\d{1,2}SM)(?:\s)/;
+            const visMatch = mainMetar.match(visRegex);
+            const visibilityStr = visMatch ? visMatch[1] : 'N/A';
+            const numericVisibility = parseVisibilityToNumber(visibilityStr);
+
+            const cloudMatches = mainMetar.match(/(SKC|CLR|FEW\d{3}|SCT\d{3}|BKN\d{3}|OVC\d{3}|VV\d{3})/g);
             let ceiling = 99999;
-            const clouds = main.match(/(SKC|CLR|FEW\d{3}|SCT\d{3}|BKN\d{3}|OVC\d{3}|VV\d{3})/g);
-            if (clouds) {
-                clouds.forEach(l => {
-                    if (l.match(/BKN|OVC|VV/)) {
-                        const alt = parseInt(l.substring(3)) * 100;
-                        if (alt < ceiling) ceiling = alt;
-                    }
+            
+            if (cloudMatches) {
+                [...new Set(cloudMatches)].forEach(layer => {
+                    if (/^(BKN|OVC|VV)/.test(layer)) ceiling = Math.min(ceiling, parseInt(layer.substring(3)) * 100);
                 });
             }
-            // Simplified vis parser for speed
-            let visNum = parseFloat(visStr.replace(/[^\d./]/g, '')) || 10;
-            return { visibility: visStr, clouds: clouds ? clouds.join(' ') : 'CLR', category: getCategory(visNum, ceiling) };
-        }
 
-        async function fetchData() {
-            const st = document.getElementById('state').value.toUpperCase();
-            const ar = document.getElementById('airport').value.toUpperCase();
-            const d = new Date(document.getElementById('date-picker').value);
-            
-            document.getElementById('results').classList.remove('hidden');
-            document.getElementById('loading').classList.remove('hidden');
-            document.getElementById('error').classList.add('hidden');
-
-            const nextD = new Date(d); nextD.setDate(d.getDate() + 1);
-
-            // Create explicit integers to avoid Pydantic list errors
-            const y1 = d.getUTCFullYear(), m1 = d.getUTCMonth() + 1, d1 = d.getUTCDate();
-            const y2 = nextD.getUTCFullYear(), m2 = nextD.getUTCMonth() + 1, d2 = nextD.getUTCDate();
-
-            const iemUrl = `https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py?network=${st}_ASOS&station=${ar}&data=all&year1=${y1}&month1=${m1}&day1=${d1}&year2=${y2}&month2=${m2}&day2=${d2}&tz=Etc/UTC&format=onlycomma&report_type=1&report_type=3`;
-
-            // List of proxies to try in order of reliability
-            const proxyPool = [
-                `https://api.allorigins.win/raw?url=${encodeURIComponent(iemUrl)}`,
-                `https://api.codetabs.com/v1/proxy?url=${encodeURIComponent(iemUrl)}`,
-                `https://corsproxy.io/?${encodeURIComponent(iemUrl)}`
-            ];
-
-            let success = false;
-            for (let proxy of proxyPool) {
-                if (success) break;
-                try {
-                    const res = await fetch(proxy);
-                    if (!res.ok) throw new Error(`Proxy status ${res.status}`);
-                    const text = await res.text();
-                    if (text.includes("<!DOCTYPE html>")) throw new Error("Invalid response");
-
-                    const lines = text.trim().split('\n').filter(l => !l.startsWith('#'));
-                    if (lines.length < 2) continue;
-
-                    const headers = lines[0].split(',');
-                    const sIdx = headers.indexOf('station'), vIdx = headers.indexOf('valid'), mIdx = headers.indexOf('metar');
-
-                    appState.reports = lines.slice(1).map(l => {
-                        const v = l.split(',');
-                        return { station: v[sIdx], valid: v[vIdx], date: new Date(v[vIdx].replace(' ', 'T') + 'Z'), metar: v[mIdx], ...parseMetar(v[mIdx]) };
-                    }).sort((a,b) => a.date - b.date);
-
-                    renderUI();
-                    success = true;
-                } catch (e) { console.warn(`Proxy failed: ${proxy}`, e); }
-            }
-
-            if (!success) {
-                document.getElementById('error').textContent = "All connections failed. Please check your network or try again in 5 minutes.";
-                document.getElementById('error').classList.remove('hidden');
-            }
-            document.getElementById('loading').classList.add('hidden');
-        }
-
-        function renderUI() {
-            // Render Summary
-            const head = document.getElementById('summary-head');
-            const body = document.getElementById('summary-body');
-            head.innerHTML = '<tr><th class="px-4 py-2">Category</th>' + [...Array(24).keys()].map(h => `<th class="px-1 text-xs">${h}Z</th>`).join('') + '</tr>';
-            
-            const totals = {};
-            Object.keys(CATEGORY_MAP).forEach(k => totals[k] = Array(24).fill(0));
-            for (let i = 0; i < appState.reports.length - 1; i++) {
-                const cur = appState.reports[i], next = appState.reports[i+1];
-                const mins = (next.date - cur.date) / 60000;
-                if (mins > 0 && mins <= 15) totals[cur.category][cur.date.getUTCHours()] += mins;
-            }
-
-            body.innerHTML = Object.keys(CATEGORY_MAP).map(cat => {
-                let row = `<td class="px-4 py-2 text-xs font-bold"><span class="px-2 rounded ${CATEGORY_MAP[cat].style}">${cat}</span></td>`;
-                for(let h=0; h<24; h++) {
-                    const m = Math.round(totals[cat][h]);
-                    row += `<td class="px-1 text-center text-[10px] ${m > 0 ? CATEGORY_MAP[cat].shade : ''}">${m || ''}</td>`;
+            let weatherStr = '';
+            if (visMatch) {
+                const afterVisibility = mainMetar.substring(visMatch.index + visMatch[0].length).trim().split(/\s+/);
+                const stopConditions = [/^(SKC|CLR|FEW|SCT|BKN|OVC|VV)/, /^M?\d{2}\/M?\d{2}$/, /^A\d{4}$/];
+                
+                for (const part of afterVisibility) {
+                    if (stopConditions.some(regex => regex.test(part))) break;
+                    weatherStr += part + ' ';
                 }
-                return `<tr>${row}</tr>`;
-            }).join('');
+            }
 
-            // Render Raw Log
-            const rawBody = document.getElementById('raw-body');
-            rawBody.innerHTML = appState.reports.map(r => `<tr><td class="px-4 py-1 font-mono text-xs">${r.station}</td><td class="px-4 py-1 font-mono text-xs">${r.valid}</td><td class="px-4 py-1 text-xs">${r.visibility}</td><td class="px-4 py-1 text-xs">${r.clouds}</td><td class="px-4 py-1 text-xs font-bold"><span class="${CATEGORY_MAP[r.category].style} px-2 rounded">${r.category}</span></td></tr>`).join('');
+            let visCategory = 'VFR', ceilCategory = 'VFR';
+            if (numericVisibility < currentCriteria.vlifr_vsby) visCategory = 'VLIFR';
+            else if (numericVisibility < currentCriteria.lifr_vsby) visCategory = 'LIFR';
+            else if (numericVisibility < currentCriteria.ifr_vsby) visCategory = 'IFR';
+            else if (numericVisibility <= currentCriteria.mvfr_vsby) visCategory = 'MVFR';
+
+            if (ceiling < currentCriteria.vlifr_cig) ceilCategory = 'VLIFR';
+            else if (ceiling < currentCriteria.lifr_cig) ceilCategory = 'LIFR';
+            else if (ceiling < currentCriteria.ifr_cig) ceilCategory = 'IFR';
+            else if (ceiling < currentCriteria.mvfr_alt_cig) ceilCategory = 'MVFR_ALT';
+            else if (ceiling < currentCriteria.mvfr_cig) ceilCategory = 'MVFR';
+
+            const finalCategory = categories[Math.max(categories.indexOf(visCategory), categories.indexOf(ceilCategory))];
+            return { visibility: visibilityStr, clouds: cloudMatches ? [...new Set(cloudMatches)].join(' ') : 'N/A', category: finalCategory, weather: weatherStr.trim() };
         }
 
-        document.getElementById('dataForm').onsubmit = (e) => { e.preventDefault(); fetchData(); };
-        document.getElementById('date-picker').valueAsDate = new Date();
+        function parseTaf(tafText, metarDate) {
+                    const hourlyForecast = Array(24).fill(null);
+                    const cleanedTaf = tafText.replace(/\n/g, ' ').replace(/\s+/g, ' ').replace(/=$/, '').trim();
+            
+                    const validTimeMatch = cleanedTaf.match(/(\d{2})(\d{2})\/(\d{2})(\d{2})/);
+                    if (!validTimeMatch) return { forecast: hourlyForecast, startHour: null };
+
+                    const startDay = parseInt(validTimeMatch[1]);
+                    const startHour = parseInt(validTimeMatch[2]);
+                    const endDay = parseInt(validTimeMatch[3]);
+                    const endHour = parseInt(validTimeMatch[4]) || 24;
+
+                    const parts = cleanedTaf.split(/\s+(?=FM|TEMPO|BECMG|PROB30)/);
+                    let currentCategory = parseMetar(parts[0], true).category;
+            
+                    for (let i = 0; i < 24; i++) {
+                        const checkDate = new Date(metarDate);
+                        checkDate.setUTCHours(i, 0, 0, 0);
+                        if ((checkDate.getUTCDate() === startDay && i >= startHour) || (checkDate.getUTCDate() === endDay && i < endHour)) {
+                            hourlyForecast[i] = currentCategory;
+                        }
+                    }
+
+                    for (let i = 1; i < parts.length; i++) {
+                        const fmMatch = parts[i].match(/^FM(\d{2})(\d{2})(\d{2})/);
+                        const tempoMatch = parts[i].match(/^(?:TEMPO|PROB30)\s(\d{2})(\d{2})\/(\d{2})(\d{2})/);
+                        const becmgMatch = parts[i].match(/^BECMG\s(\d{2})(\d{2})\/(\d{2})(\d{2})/);
+                
+                        if (fmMatch) {
+                            currentCategory = parseMetar(parts[i], true).category;
+                            for (let h = 0; h < 24; h++) {
+                                 const checkDate = new Date(metarDate).setUTCHours(h, 0, 0, 0);
+                                 if (hourlyForecast[h] !== null && new Date(checkDate).getUTCDate() >= parseInt(fmMatch[1]) && (new Date(checkDate).getUTCDate() > parseInt(fmMatch[1]) || h >= parseInt(fmMatch[2]))) {
+                                     hourlyForecast[h] = currentCategory;
+                                 }
+                            }
+                        } else if (becmgMatch) {
+                            // BECMG is a permanent change. Apply conservatively from the start of the BECMG window.
+                            currentCategory = parseMetar(parts[i], true).category;
+                            const fromDay = parseInt(becmgMatch[1]), fromHour = parseInt(becmgMatch[2]);
+                    
+                            for (let h = 0; h < 24; h++) {
+                                 const checkDate = new Date(metarDate).setUTCHours(h, 0, 0, 0);
+                                 if (hourlyForecast[h] !== null && new Date(checkDate).getUTCDate() >= fromDay && (new Date(checkDate).getUTCDate() > fromDay || h >= fromHour)) {
+                                     hourlyForecast[h] = currentCategory;
+                                 }
+                            }
+                        } else if (tempoMatch) {
+                            const tempCategory = parseMetar(parts[i], true).category;
+                            const fromDay = parseInt(tempoMatch[1]), fromHour = parseInt(tempoMatch[2]);
+                            const toDay = parseInt(tempoMatch[3]), toHour = parseInt(tempoMatch[4]) || 24;
+
+                            for (let h = 0; h < 24; h++) {
+                                const checkDate = new Date(metarDate);
+                                checkDate.setUTCHours(h, 0, 0, 0);
+                                const isAfterStart = checkDate.getUTCDate() > fromDay || (checkDate.getUTCDate() === fromDay && h >= fromHour);
+                                const isBeforeEnd = checkDate.getUTCDate() < toDay || (checkDate.getUTCDate() === toDay && h < toHour);
+                        
+                                if (isAfterStart && isBeforeEnd && hourlyForecast[h] !== null) {
+                                    // Compare the severity of the current category vs the TEMPO category
+                                    const currentCatIdx = categories.indexOf(hourlyForecast[h]);
+                                    const tempCatIdx = categories.indexOf(tempCategory);
+                            
+                                    // Only overwrite if the TEMPO category is worse
+                                    if (tempCatIdx > currentCatIdx) {
+                                        hourlyForecast[h] = tempCategory;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    return { forecast: hourlyForecast, startHour };
+                }        
+
+        // UI Renders
+        function updateSummaryWithTaf(hourlyForecast, tafStartHour) {
+            let tafRow = getEl('taf-forecast-row') || (() => {
+                const row = document.createElement('tr');
+                row.id = 'taf-forecast-row';
+                summaryBody.appendChild(row);
+                return row;
+            })();
+
+            tafRow.innerHTML = `<td class="px-4 py-3 whitespace-nowrap text-sm font-semibold">TAF Forecast</td>` + hourlyForecast.map((category, i) => {
+                let cellStyle = '';
+                if (tafStartHour !== null) {
+                    if (i === tafStartHour) cellStyle = 'border-t-2 border-b-2 border-l-2 border-gray-700';
+                    else if (i > tafStartHour && i < tafStartHour + 5) cellStyle = 'border-t-2 border-b-2 border-gray-700';
+                    else if (i === tafStartHour + 5) cellStyle = 'border-t-2 border-b-2 border-r-2 border-gray-700';
+                }
+                return category ? 
+                    `<td class="px-4 py-3 whitespace-nowrap text-sm text-center font-mono ${cellStyle}"><span class="px-2 py-1 rounded-full text-xs ${categoryStyles[category]?.badge || ''}">${category}</span></td>` : 
+                    `<td class="px-4 py-3 ${cellStyle}"></td>`;
+            }).join('');
+        }
+
+        function displayData(csvText) {
+            const lines = csvText.trim().split('\n').filter(line => !line.startsWith('#'));
+            if (lines.length < 2) return showError("The CSV data is empty or invalid.");
+
+            const headers = lines[0].split(',');
+            const stationIdx = headers.indexOf('station'), validIdx = headers.indexOf('valid'), metarIdx = headers.indexOf('metar');
+
+            if (stationIdx === -1 || validIdx === -1 || metarIdx === -1) return showError("The CSV data is missing required columns.");
+
+            allParsedReports = lines.slice(1).filter(l => l.trim()).map(line => {
+                const values = line.split(',');
+                return {
+                    station: values[stationIdx].trim(),
+                    valid: values[validIdx].trim(),
+                    timestamp: new Date(values[validIdx].trim().replace(' ', 'T') + 'Z'),
+                    metar: values[metarIdx].trim(),
+                    ...parseMetar(values[metarIdx].trim())
+                };
+            });
+            
+            isSortAscending = true;
+            allParsedReports.sort((a, b) => a.timestamp - b.timestamp);
+            renderRawDataLog();
+
+            hourlyTotals = Object.fromEntries(categories.map(cat => [cat, Array(24).fill(0)]));
+
+            for (let i = 0; i < allParsedReports.length - 1; i++) {
+                const current = allParsedReports[i], next = allParsedReports[i+1];
+                const duration = (next.timestamp - current.timestamp) / 60000; // minutes
+                if (duration > 0 && duration <= 15) hourlyTotals[current.category][current.timestamp.getUTCHours()] += duration;
+            }
+            
+            const dominantCategories = Array.from({length: 24}, (_, i) => 
+                categories.reduce((dom, cat) => hourlyTotals[cat][i] >= (dom ? hourlyTotals[dom][i] : 1) ? cat : dom, null)
+            );
+
+            summaryHead.innerHTML = `<tr><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>${Array.from({length: 24}, (_, i) => `<th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">${String(i).padStart(2, '0')}</th>`).join('')}</tr>`;
+
+            summaryBody.innerHTML = categories.map(cat => `
+                <tr>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm font-semibold"><span class="px-2 py-1 rounded-full ${categoryStyles[cat].badge}">${cat}</span></td>
+                    ${Array.from({length: 24}, (_, i) => {
+                        const mins = Math.round(hourlyTotals[cat][i]);
+                        const shade = (mins > 0 && dominantCategories[i] === cat) ? categoryStyles[cat].shade : '';
+                        return `<td class="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-700 font-mono ${shade}">${mins > 0 ? mins : ''}</td>`;
+                    }).join('')}
+                </tr>
+            `).join('');
+        }
+
+        function renderRawDataLog() {
+            tableHead.innerHTML = `
+                <tr>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Station</th>
+                    <th id="valid-header" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sortable-header">Valid <span id="sort-indicator">${isSortAscending ? '▼' : '▲'}</span></th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Visibility</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Weather</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cloud Bases</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Flight Category</th>
+                </tr>
+            `;
+
+            tableBody.innerHTML = allParsedReports.map(report => `
+                <tr>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700 font-mono">${report.station}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700 font-mono">${report.valid}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700 font-mono">${report.visibility}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700 font-mono">${report.weather}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700 font-mono">${report.clouds}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm font-semibold font-mono">
+                        <span class="px-2 py-1 rounded-full ${categoryStyles[report.category]?.badge || 'bg-gray-200'}">${report.category}</span>
+                    </td>
+                </tr>
+            `).join('');
+
+            getEl('valid-header').addEventListener('click', () => {
+                isSortAscending = !isSortAscending;
+                allParsedReports.sort((a, b) => isSortAscending ? a.timestamp - b.timestamp : b.timestamp - a.timestamp);
+                renderRawDataLog();
+            });
+        }
+        
+        function showError(message) {
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('hidden');
+            [tableContainer, summaryTableContainer, criteriaContainer].forEach(el => el.classList.add('hidden'));
+        }
+
     </script>
 </body>
 </html>
